@@ -11,7 +11,7 @@ import { APPS_SCRIPT_DEMO_MODE, API_STATUS, MOCK_MODE, submitAnonymousResult as 
 import { clearAllocationRecovery, clearPendingRequest, readPendingRequest, savePendingRequest } from "./sessionRecovery.js";
 
 const $ = (selector) => document.querySelector(selector);
-const setDownloadButtonsDisabled = (disabled) => document.querySelectorAll('[data-action="download-result"], [data-action="download-and-visit"]').forEach((button) => { button.disabled = disabled; });
+const setDownloadButtonsDisabled = (disabled) => document.querySelectorAll('[data-action="download-result"]').forEach((button) => { button.disabled = disabled; });
 const RESULT_ILLUSTRATIONS = {
   experience: "./assets/result/賽事收藏家.webp",
   lifestyle: "./assets/result/自在巡航員.webp",
@@ -370,13 +370,6 @@ document.addEventListener("click", (event) => {
   if (!action || !content) return;
   if (action.startsWith("mock-") && !MOCK_MODE) return;
   if (action === "download-result") { event.preventDefault(); downloadResultCard(); return; }
-  if (action === "download-and-visit") {
-    event.preventDefault();
-    if (target.disabled || !state.shareCardBlob || !state.shareCardUrl) return;
-    downloadResultCard();
-    window.open($("[data-ig-placeholder]").href, "_blank", "noopener,noreferrer");
-    return;
-  }
   if (state.submitInProgress && ["home", "retry", "restart", "back-result"].includes(action)) { event.preventDefault(); return; }
   if (action === "start") start();
   if (["home", "retry", "restart"].includes(action)) { event.preventDefault(); reset(); showScreen(elements.start); }
@@ -469,11 +462,11 @@ async function restorePendingSubmission() {
 loadContent().then((loaded) => {
   content = loaded;
   if (content.version !== 2) throw new Error("V2 content required");
-  elements.igImage.src = resolveProjectAsset("./assets/Garmin永續故事.webp");
   elements.igImage.addEventListener("load", () => {
     elements.igImage.hidden = false;
     $(`[data-ig-fallback]`).hidden = true;
   }, { once: true });
+  elements.igImage.src = resolveProjectAsset("./assets/Garmin永續故事.webp");
   updateStaticText();
   $("[data-action=start]").disabled = false;
   restorePendingSubmission();

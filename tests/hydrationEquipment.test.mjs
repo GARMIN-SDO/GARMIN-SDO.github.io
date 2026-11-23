@@ -292,7 +292,10 @@ test("hydration images and result layout are isolated from prize inventory and r
   assert.match(css, /\.prize-card\s*\{[^}]*border:\s*1px solid rgba\(247,250,248,\.82\)/s);
   assert.match(html, /class="redemption-action-card result-download-card"[^>]*data-action="download-result"/);
   assert.doesNotMatch(html, /class="result-download-copy"/);
-  assert.match(html, /class="redemption-cta redemption-share-cta" id="share-save-label"[^>]*data-action="download-and-visit"/);
+  assert.match(html, /class="redemption-share-heading"[\s\S]*data-i18n="v2.shareRaffleTitle"[\s\S]*src="\.\/assets\/Forerunner70\.png"/);
+  assert.match(html, /data-i18n="v2.shareSaveStep"/);
+  assert.match(html, /data-i18n="v2.igStoryStep"/);
+  assert.match(html, /class="redemption-cta redemption-share-cta"[^>]*href="https:\/\/www\.instagram\.com[^"]*"[^>]*data-i18n="v2.shareCommentStep"/);
   assert.match(html, /class="redemption-action-card ig-placeholder-card"[^>]*href="https:\/\/www\.instagram\.com/);
   assert.doesNotMatch(html, /id="ig-story-label"/);
   assert.match(css, /\.prize-card\s*\{[^}]*width:\s*min\(100%,\s*var\(--redemption-extras-max-width\)\)/s);

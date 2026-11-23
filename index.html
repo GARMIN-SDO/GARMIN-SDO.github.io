@@ -166,21 +166,19 @@
         <p class="redemption-instruction" data-i18n="v2.redemptionInstruction"></p>
         <p class="sustainability-message" data-sustainability-message hidden></p>
         <div class="redemption-extras">
-          <div class="redemption-action-column">
-            <button class="redemption-action-card result-download-card" type="button" data-i18n-aria="v2.shareDownload" data-action="download-result" disabled>
-              <span class="result-download-preview"><img data-share-preview alt="" hidden /><span data-share-status data-i18n="v2.sharePreparing" aria-live="polite"></span></span>
-            </button>
+          <div class="redemption-share-heading">
+            <h2 data-i18n="v2.shareRaffleTitle"></h2>
+            <img class="redemption-watch" src="./assets/Forerunner70.png" alt="" loading="lazy" />
           </div>
-          <div class="redemption-action-column">
-            <a class="redemption-action-card ig-placeholder-card" data-i18n-aria="v2.igStoryButton" href="https://www.instagram.com/p/DejRMWyFydj/?img_index=1" target="_blank" rel="noopener noreferrer" data-ig-placeholder>
-              <span class="ig-placeholder-thumbnail" aria-hidden="true"><img class="ig-placeholder-image" data-ig-image alt="" hidden /><span data-ig-fallback>IG</span></span>
-            </a>
-          </div>
-          <img class="redemption-watch" src="./assets/Forerunner70.png" alt="" aria-hidden="true" loading="lazy" />
-          <button class="redemption-cta redemption-share-cta" id="share-save-label" type="button" data-action="download-and-visit" disabled>
-            <span data-i18n="v2.shareAndVisitLine1"></span>
-            <span data-i18n="v2.shareAndVisitLine2"></span>
+          <button class="redemption-action-card result-download-card" type="button" data-i18n-aria="v2.shareDownload" data-action="download-result" disabled>
+            <span class="redemption-step" data-i18n="v2.shareSaveStep"></span>
+            <span class="result-download-preview"><img data-share-preview alt="" hidden /><span data-share-status data-i18n="v2.sharePreparing" aria-live="polite"></span></span>
           </button>
+          <a class="redemption-action-card ig-placeholder-card" href="https://www.instagram.com/p/DejRMWyFydj/?img_index=1" target="_blank" rel="noopener noreferrer" data-ig-placeholder>
+            <span class="redemption-step" data-i18n="v2.igStoryStep"></span>
+            <span class="ig-placeholder-thumbnail" aria-hidden="true"><img class="ig-placeholder-image" data-ig-image alt="" hidden /><span data-ig-fallback>IG</span></span>
+          </a>
+          <a class="redemption-cta redemption-share-cta" href="https://www.instagram.com/p/DejRMWyFydj/?img_index=1" target="_blank" rel="noopener noreferrer" data-i18n="v2.shareCommentStep"></a>
         </div>
         <button class="button button-secondary button-wide redemption-restart" type="button" data-action="restart" data-i18n="redemption.restart"></button>
       </section>

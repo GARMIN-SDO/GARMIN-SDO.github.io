@@ -1316,10 +1316,7 @@ label {
   --share-card-aspect-ratio: 9 / 16;
   --redemption-preview-aspect-ratio: var(--share-card-aspect-ratio);
   --redemption-extra-margin: 28px;
-  --share-card-padding-block: 12px;
   --share-copy-gap: 10px;
-  --share-hover-lift: 3px;
-  --share-active-scale: .985;
   min-height: calc(100vh - 124px);
   padding-bottom: 36px;
   margin-inline: calc(-1 * var(--gutter));
@@ -1510,69 +1507,131 @@ label {
   margin-top: 20px;
 }
 
-/* Paired cards and green CTAs */
+/* Share raffle */
 .redemption-extras {
-  position: relative;
-  isolation: isolate;
-  --redemption-watch-width: 42%;
-  --redemption-watch-bottom: -24px;
+  --redemption-watch-width: clamp(160px, 38vw, 200px);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--redemption-action-gap);
+  gap: var(--share-copy-gap) var(--redemption-action-gap);
   width: min(100%, var(--redemption-extras-max-width));
-  margin-block: var(--redemption-extra-margin);
-  margin-inline: auto;
+  margin: var(--redemption-extra-margin) auto;
 }
 
-.redemption-action-column {
+.redemption-share-heading {
+  position: relative;
+  grid-column: 1 / -1;
   display: grid;
-  grid-template-rows: minmax(0, 1fr);
-  align-content: start;
-  gap: 12px;
-  min-width: 0;
+  place-items: center;
+  min-height: var(--redemption-cta-height);
+  padding: 8px calc(var(--redemption-watch-width) * .5) 8px 16px;
+  color: var(--brand-black);
+  text-align: center;
+}
+
+.redemption-share-heading::before {
+  position: absolute;
+  inset: 0;
+  background: var(--brand-green);
+  clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%, 0 50%);
+  content: "";
+}
+
+.redemption-share-heading h2 {
+  position: relative;
+  margin: 0;
+  font-size: clamp(15px, 4vw, 26px);
+  line-height: 1.25;
+}
+
+.redemption-watch {
+  position: absolute;
+  bottom: -8px;
+  right: calc(var(--redemption-watch-width) * -.14);
+  width: var(--redemption-watch-width);
+  transform: rotate(15deg);
+  pointer-events: none;
 }
 
 .redemption-action-card {
   display: grid;
-  align-content: start;
-  justify-items: stretch;
-  gap: var(--share-copy-gap);
-  width: 100%;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
   min-width: 0;
-  padding: var(--share-card-padding-block);
-  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--brand-white);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.redemption-step,
+.redemption-cta {
+  display: grid;
+  place-items: center;
+  min-height: var(--redemption-cta-height);
+  padding: 6px 8px;
   border: 1px solid rgba(247,250,248,.9);
-  border-radius: var(--redemption-action-radius);
   background: rgba(8,11,13,.58);
   color: var(--brand-white);
+  font-size: clamp(11px, 2.8vw, 16px);
+  font-weight: var(--weight-emphasis);
+  line-height: 1.35;
   text-align: center;
-  text-decoration: none;
-  box-shadow: var(--redemption-action-shadow);
-  cursor: pointer;
-  transition: transform var(--motion-duration) ease, box-shadow var(--motion-duration) ease, border-color var(--motion-duration) ease, background-color var(--motion-duration) ease;
+}
+
+.redemption-step {
+  border-radius: var(--redemption-cta-radius);
+}
+
+.redemption-action-card,
+.redemption-step,
+.result-download-preview,
+.ig-placeholder-thumbnail,
+.redemption-cta {
+  transition: transform var(--motion-duration) ease, background-color var(--motion-duration) ease, color var(--motion-duration) ease, border-color var(--motion-duration) ease, box-shadow var(--motion-duration) ease;
+}
+
+.redemption-action-card:hover:not(:disabled) .redemption-step,
+.redemption-action-card:focus-visible .redemption-step,
+.redemption-action-card:hover:not(:disabled) .result-download-preview,
+.redemption-action-card:focus-visible .result-download-preview,
+.redemption-action-card:hover .ig-placeholder-thumbnail,
+.redemption-action-card:focus-visible .ig-placeholder-thumbnail {
+  border-color: var(--brand-green);
+  box-shadow: 0 8px 20px rgba(0,0,0,.32);
 }
 
 .redemption-action-card:hover:not(:disabled),
-.redemption-action-card:focus-visible {
-  transform: translateY(calc(-1 * var(--share-hover-lift)));
-  border-color: var(--brand-green);
-  background: rgba(17,23,26,.96);
-  box-shadow: 0 15px 32px rgba(0,0,0,.32);
+.redemption-action-card:focus-visible,
+.redemption-cta:hover,
+.redemption-cta:focus-visible {
+  transform: translateY(-3px);
 }
 
-.redemption-action-card:active:not(:disabled) {
-  transform: scale(var(--share-active-scale));
+.redemption-cta:hover,
+.redemption-cta:focus-visible {
+  border-color: var(--brand-green);
+  background: var(--brand-green);
+  color: var(--brand-black);
+  box-shadow: 0 8px 20px rgba(0,0,0,.32);
 }
 
 .redemption-action-card:disabled {
   cursor: progress;
-  opacity: .78;
 }
 
 .redemption-action-card:focus-visible,
 .redemption-cta:focus-visible {
   outline: 3px solid var(--brand-white);
   outline-offset: 3px;
+}
+
+.result-download-preview,
+.ig-placeholder-thumbnail {
+  border: 1px solid rgba(247,250,248,.9);
+  border-radius: var(--redemption-action-radius);
+  box-shadow: var(--redemption-action-shadow);
 }
 
 .result-download-preview {
@@ -1599,7 +1658,6 @@ label {
 }
 
 .ig-placeholder-card {
-  gap: 0;
   padding: 0;
 }
 
@@ -1630,81 +1688,21 @@ label {
   display: none;
 }
 
-.redemption-cta {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  min-width: 0;
-  min-height: var(--redemption-cta-height);
-  padding: 10px 8px;
-  border: 0;
-  border-radius: var(--redemption-cta-radius);
-  background: var(--brand-green);
-  color: var(--brand-black);
-  font-size: var(--font-body);
-  font-weight: var(--weight-emphasis);
-  line-height: var(--line-height-body);
-  text-align: center;
-  text-decoration: none;
-  cursor: pointer;
-  transition: transform var(--motion-duration) ease, filter var(--motion-duration) ease;
-}
-
-/* 下載＋IG 共用按鈕：跨越雙卡，兩行文案置中。 */
-.redemption-share-cta {
-  grid-column: 1 / -1;
-  position: relative;
-  z-index: 2;
-  width: 74%;
-  min-height: 54px;
-  border-radius: var(--redemption-cta-radius);
-  gap: 2px;
-  padding: 8px 12px;
-  font-size: clamp(11px, 2.8vw, 16px);
-  line-height: 1.45;
-}
-
-/* 手錶覆蓋社群卡下緣；不攔截圖片或按鈕點擊。 */
-.redemption-watch {
+.result-download-preview img:not([hidden]) + [data-share-status] {
   position: absolute;
-  z-index: 3;
-  /* 補償原圖透明留白，讓旋轉後的手錶輪廓貼齊右緣。 */
-  right: calc(var(--redemption-watch-width) * -0.188);
-  bottom: var(--redemption-watch-bottom);
-  width: var(--redemption-watch-width);
-  max-width: 100%;
-  height: auto;
-  object-fit: contain;
-  transform: rotate(15deg);
-  transform-origin: center;
-  pointer-events: none;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
-.redemption-share-cta span {
-  display: block;
-}
-
-.redemption-cta:hover:not(:disabled),
-.redemption-cta:focus-visible {
-  filter: brightness(.92);
-  transform: translateY(-2px);
-}
-
-.redemption-cta:active:not(:disabled) {
-  transform: scale(var(--share-active-scale));
-}
-
-.redemption-cta:disabled {
-  cursor: progress;
-  opacity: .65;
+.redemption-cta {
+  grid-column: 1 / -1;
+  border-radius: var(--redemption-cta-radius);
+  text-decoration: none;
 }
 
 @media (max-width: 350px) {
-  .redemption-extras {
-    grid-template-columns: minmax(0, 1fr);
-    width: min(100%, 280px);
-  }
-
   .prize-card {
     width: min(100%, 280px);
   }
@@ -1900,15 +1898,10 @@ input::placeholder {
   .screen-redemption {
     --redemption-action-gap: 20px;
     --redemption-extra-margin: 30px;
-    --share-card-padding-block: 18px;
     --share-copy-gap: 16px;
     --redemption-prize-padding: 54px 40px 28px;
     --redemption-prize-image-height: 440px;
     --redemption-cta-height: 60px;
-  }
-
-  .redemption-extras {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
