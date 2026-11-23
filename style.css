@@ -1552,6 +1552,14 @@ label {
   pointer-events: none;
 }
 
+@media (max-width: 600px) {
+  .redemption-extras {
+    --redemption-watch-width: clamp(100px, 28vw, 124px);
+    /* Reserve the rotated watch's height above the heading, plus a text gap. */
+    margin-top: max(var(--redemption-extra-margin), calc(var(--redemption-watch-width) * 1.225 - var(--redemption-cta-height) + 16px));
+  }
+}
+
 .redemption-action-card {
   display: grid;
   grid-row: span 2;
