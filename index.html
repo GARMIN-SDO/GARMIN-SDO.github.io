@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="zh-Hant" data-ui-version="2">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Garmin Run 跑者風格與補水方式互動測驗" data-i18n-content="meta.description" />
+    <title data-i18n="meta.title">Garmin Run｜跑者風格測驗</title>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Garmin Run｜跑者風格測驗" />
+    <meta property="og:description" content="Garmin Run 跑者風格與補水方式互動測驗" />
+    <meta property="og:image" content="https://yi-cheng-lin-ntu.github.io/GarminRunYourRunningGear/assets/%E6%B0%B8%E7%BA%8C%E5%85%88%E9%8B%92%E9%9A%8A.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="709" />
+    <meta property="og:image:height" content="709" />
+    <meta property="og:image:alt" content="永續先鋒隊" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Garmin Run｜跑者風格測驗" />
+    <meta name="twitter:description" content="Garmin Run 跑者風格與補水方式互動測驗" />
+    <meta name="twitter:image" content="https://yi-cheng-lin-ntu.github.io/GarminRunYourRunningGear/assets/%E6%B0%B8%E7%BA%8C%E5%85%88%E9%8B%92%E9%9A%8A.png" />
+    <meta name="twitter:image:alt" content="永續先鋒隊" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#start" data-action="home" data-i18n-aria="brand.home"><span class="brand-prefix" data-i18n="brand.headerPrefix"></span> <span data-i18n="brand.headerRun"></span></a>
+      <div class="header-actions">
+        <button class="mock-tools-button" type="button" data-action="mock-tools" data-i18n="v2.mockTools" hidden></button>
+        <button class="language-toggle" type="button" data-action="toggle-language" data-i18n-aria="language.toggle">
+          <span data-language-label></span>
+        </button>
+      </div>
+    </header>
+
+    <aside class="mock-tools-panel" data-mock-panel hidden data-i18n-aria="v2.mockPanelLabel">
+      <div class="mock-tools-header">
+        <div>
+          <p class="eyebrow" data-i18n="v2.mockEyebrow"></p>
+          <h2 data-i18n="v2.mockTitle"></h2>
+        </div>
+        <button class="text-button" type="button" data-action="close-mock-tools" data-i18n="v2.close"></button>
+      </div>
+      <p class="mock-tools-note" data-i18n="v2.mockNote"></p>
+      <div class="mock-scenarios">
+        <button class="button button-secondary" type="button" data-action="mock-scenario" data-scenario="premium_available" data-i18n="v2.mockPremiumAvailable"></button>
+        <button class="button button-secondary" type="button" data-action="mock-scenario" data-scenario="premium_empty" data-i18n="v2.mockPremiumEmpty"></button>
+        <button class="button button-secondary" type="button" data-action="mock-scenario" data-scenario="general_empty" data-i18n="v2.mockGeneralEmpty"></button>
+        <button class="button button-secondary" type="button" data-action="mock-reset" data-i18n="v2.mockReset"></button>
+        <button class="button button-secondary" type="button" data-action="mock-clear" data-i18n="v2.mockClear"></button>
+      </div>
+      <div class="mock-stock-editor" data-mock-stock-editor></div>
+      <div class="mock-snapshot">
+        <h3 data-i18n="v2.mockPrizes"></h3>
+        <div data-mock-prizes></div>
+        <h3 data-i18n="v2.mockParticipants"></h3>
+        <div data-mock-participants></div>
+        <h3 data-i18n="v2.mockAllocations"></h3>
+        <div data-mock-allocations></div>
+        <h3 data-i18n="v2.mockInventoryLog"></h3>
+        <div data-mock-inventory-log></div>
+      </div>
+    </aside>
+
+    <main class="app-shell">
+      <section class="screen screen-start is-active" id="start" aria-labelledby="start-title">
+        <div class="start-heading">
+          <p class="start-brand" aria-label="Garmin Run"><span data-i18n="brand.garmin"></span> <span data-i18n="brand.run"></span></p>
+          <h1 id="start-title" data-i18n="v2.startTitle"></h1>
+        </div>
+        <div class="start-visual" aria-hidden="true">
+          <img src="./assets/首頁圖片.webp" alt="" fetchpriority="high" />
+        </div>
+        <p class="start-manifesto" aria-label="You Run. You Choose. We Change.">
+          <span data-i18n="v2.startManifestoRun"></span>
+          <span data-i18n="v2.startManifestoChoose"></span>
+          <span data-i18n="v2.startManifestoChange"></span>
+        </p>
+        <button class="button button-primary button-wide" type="button" data-action="start" data-i18n="v2.startButton" disabled></button>
+        <p class="lead" data-i18n="v2.startDescription"></p>
+      </section>
+
+      <section class="screen screen-quiz" id="quiz" aria-labelledby="question-title" hidden>
+        <div class="quiz-topline">
+          <button class="text-button" type="button" data-action="back" data-i18n="navigation.back"></button>
+        </div>
+        <div class="progress-track" data-i18n-aria="quiz.progress" data-progress-track>
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="question-intro">
+          <div class="question-number-wrap">
+            <span class="question-number" data-question-number></span><span class="question-total" data-i18n="quiz.total"></span>
+          </div>
+          <p class="question-subtitle" data-question-subtitle></p>
+          <h2 id="question-title" data-question-prompt></h2>
+        </div>
+        <form class="options-list" data-options-list></form>
+        <div class="quiz-actions">
+          <button class="button button-primary button-wide" type="button" data-action="next" data-i18n="navigation.next" disabled></button>
+        </div>
+      </section>
+
+      <section class="screen screen-result" id="result" aria-labelledby="result-title" hidden>
+        <article class="result-share-card" data-result-card>
+          <div class="result-layout">
+            <section class="result-identity">
+              <div class="result-hero-frame">
+                <header class="v2-result-heading">
+                  <p class="eyebrow" data-i18n="v2.youAre"></p>
+                  <h2 id="result-title" data-result-title></h2>
+                  <p class="v2-slogan" data-result-slogan></p>
+                </header>
+                <div class="runner-visual" data-runner-visual>
+                  <img class="runner-visual-image" data-runner-image alt="" hidden />
+                </div>
+              </div>
+              <div class="runner-tags" data-runner-tags>
+                <div class="runner-tag" data-result-tag="0"></div>
+                <div class="runner-tag tag-2" data-result-tag="1"></div>
+                <div class="runner-tag tag-3" data-result-tag="2"></div>
+                <div class="runner-tag tag-4" data-result-tag="3"></div>
+              </div>
+            </section>
+            <section class="v2-recommendation" aria-labelledby="recommendation-title" data-recommendation-section>
+              <div class="pioneer-result-banner" data-existing-hydration hidden>
+                <h3 data-i18n="v2.pioneerThanks"></h3>
+              </div>
+              <p id="recommendation-title" class="section-label" data-i18n="v2.recommendation"></p>
+              <div class="hydration-recommendation-row">
+                <div class="hydration-equipment" data-hydration-equipment role="group" data-i18n-aria="v2.equipmentImages" hidden></div>
+                <img class="sustainability-result-mark" data-sustainability-result-mark alt="" hidden />
+                <div class="hydration-copy">
+                  <h3 data-recommendation-heading></h3>
+                  <p data-recommendation-description></p>
+                </div>
+              </div>
+            </section>
+          </div>
+        </article>
+        <section class="v2-invitation" aria-labelledby="invitation-title">
+          <fieldset data-hydration-options>
+            <legend id="invitation-title" data-i18n="v2.invitation"></legend>
+            <p data-i18n="v2.invitationNote"></p>
+            <div class="hydration-choices">
+              <label class="choice-card"><input type="radio" name="hydrationCommitment" value="joined" data-hydration-choice /><span><strong data-i18n="v2.joined"></strong></span></label>
+              <label class="choice-card"><input type="radio" name="hydrationCommitment" value="considering" data-hydration-choice /><span><strong data-i18n="v2.considering"></strong></span></label>
+            </div>
+          </fieldset>
+          <p class="form-error" data-result-error role="alert" hidden></p>
+          <button class="button button-primary button-wide" type="button" data-action="continue" data-i18n="v2.continue"></button>
+        </section>
+        <button class="button button-secondary button-wide v2-retry" type="button" data-action="retry" data-i18n="v2.retry"></button>
+      </section>
+
+      <section class="screen screen-redemption" id="redemption" aria-labelledby="redemption-title" hidden>
+        <div class="redemption-banner">
+          <p class="eyebrow" data-i18n="redemption.eyebrow"></p>
+          <p class="runner-type" data-redemption-runner></p>
+        </div>
+        <h2 class="allocation-paused-message" id="allocation-paused-title" data-paused-message hidden></h2>
+        <div class="prize-card">
+          <h2 class="redemption-prize-title" id="redemption-title" data-redemption-title data-i18n="v2.redemptionTitle"></h2>
+          <div class="prize-image" data-prize-image>
+            <span data-i18n="redemption.placeholder"></span>
+          </div>
+          <p class="prize-name" data-prize-name></p>
+        </div>
+        <p class="redemption-instruction" data-i18n="v2.redemptionInstruction"></p>
+        <p class="sustainability-message" data-sustainability-message hidden></p>
+        <div class="redemption-extras">
+          <div class="redemption-action-column">
+            <button class="redemption-action-card result-download-card" type="button" data-i18n-aria="v2.shareDownload" data-action="download-result" disabled>
+              <span class="result-download-preview"><img data-share-preview alt="" hidden /><span data-share-status data-i18n="v2.sharePreparing" aria-live="polite"></span></span>
+            </button>
+          </div>
+          <div class="redemption-action-column">
+            <a class="redemption-action-card ig-placeholder-card" data-i18n-aria="v2.igStoryButton" href="https://www.instagram.com/p/DejRMWyFydj/?img_index=1" target="_blank" rel="noopener noreferrer" data-ig-placeholder>
+              <span class="ig-placeholder-thumbnail" aria-hidden="true"><img class="ig-placeholder-image" data-ig-image alt="" hidden /><span data-ig-fallback>IG</span></span>
+            </a>
+          </div>
+          <img class="redemption-watch" src="./assets/Forerunner70.png" alt="" aria-hidden="true" loading="lazy" />
+          <button class="redemption-cta redemption-share-cta" id="share-save-label" type="button" data-action="download-and-visit" disabled>
+            <span data-i18n="v2.shareAndVisitLine1"></span>
+            <span data-i18n="v2.shareAndVisitLine2"></span>
+          </button>
+        </div>
+        <button class="button button-secondary button-wide redemption-restart" type="button" data-action="restart" data-i18n="redemption.restart"></button>
+      </section>
+    </main>
+
+    <div class="share-render-stage" data-share-stage aria-hidden="true" inert>
+      <div class="share-render-map"></div>
+      <div class="share-render-header" aria-hidden="true">
+        <span data-i18n="brand.headerPrefix"></span>
+        <span data-i18n="brand.headerRun"></span>
+        <span data-i18n="v2.shareCardHeaderSuffix"></span>
+      </div>
+      <div class="share-render-context" data-share-context>
+        <section class="screen-result share-render-root">
+          <article class="result-share-card" data-share-root></article>
+        </section>
+      </div>
+      <div class="share-render-footer" aria-hidden="true">
+        <span data-i18n="v2.footerLead"></span>
+        <span class="footer-change" data-i18n="v2.shareFooterChange"></span>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      <span class="site-footer-tagline">
+        <span data-i18n="v2.footerLead"></span>
+        <span class="footer-change" data-i18n="v2.startFooterChange"></span>
+      </span>
+    </footer>
+    <script src="js/vendor/html-to-image.js"></script>
+    <script type="module" src="js/appV2.js"></script>
+  </body>
+</html>
