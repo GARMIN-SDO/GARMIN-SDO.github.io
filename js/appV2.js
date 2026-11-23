@@ -1,4 +1,4 @@
-import { loadContent } from "./contentData.js";
+import { loadContent } from "./contentData.js?v=20261123-redemption-2";
 import { classifyAnswers } from "./classificationEngine.js";
 import { classificationRules } from "./classificationRules.js";
 import { derivePrizeEligibility } from "./prizeEligibility.js";

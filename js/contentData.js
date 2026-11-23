@@ -205,7 +205,7 @@ function buildContent(rows) {
 }
 
 export async function loadContent(url = CSV_URL) {
-  const response = await fetch(url);
+  const response = await fetch(url, { cache: "no-cache" });
   if (!response.ok) {
     throw new Error(`Unable to load content.csv (${response.status}).`);
   }
