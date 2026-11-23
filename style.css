@@ -1509,7 +1509,7 @@ label {
 
 /* Share raffle */
 .redemption-extras {
-  --redemption-watch-width: clamp(160px, 38vw, 200px);
+  --redemption-watch-width: clamp(160px, 38vw, 180px);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--share-copy-gap) var(--redemption-action-gap);
