@@ -16,14 +16,13 @@ export function renderRedemptionView(allocation, { state, elements, resultData, 
     : prize
       ? copyOr(`prize.${prize.prizeId}`, text({ zh: prize.nameZh, en: prize.nameEn }))
       : copyOr("v2.prizeDetailsUnavailable", state.language === "zh" ? "獎品資料尚未確認" : "Prize details unavailable");
-  elements.prizeCard.hidden = allocationPaused;
+  elements.prizeCard.hidden = false;
   elements.pausedMessage.hidden = !allocationPaused;
   elements.pausedMessage.textContent = allocationPaused
-    ? copyOr("v2.pausedPrizes", state.language === "zh"
-      ? "獎品已發放完畢，謝謝參與"
-      : "All prizes have been distributed. Thank you for participating.")
+    ? copyOr("v2.pausedThanks", state.language === "zh" ? "謝謝參與" : "Thank you for participating.")
     : "";
-  elements.redemption.setAttribute("aria-labelledby", allocationPaused ? "allocation-paused-title" : "redemption-title");
+  elements.prizeName.hidden = allocationPaused;
+  elements.redemption.setAttribute("aria-labelledby", "redemption-title");
   elements.redemption.classList.toggle("is-allocation-paused", allocationPaused);
 
   elements.prizeImage.classList.remove("has-image");
@@ -54,13 +53,14 @@ export function renderRedemptionView(allocation, { state, elements, resultData, 
   }
 
   const greenVersion = allocation.sustainabilityRewardEligible === true;
-  const showSustainabilityTheme = greenVersion && !allocationPaused;
+  const showSustainabilityTheme = greenVersion;
   elements.redemption.classList.toggle("is-sustainable", showSustainabilityTheme);
-  elements.redemption.classList.toggle("is-non-sustainable", !greenVersion && !allocationPaused);
-  elements.prizeImage.classList.toggle("is-non-sustainable", !greenVersion && !allocationPaused);
+  elements.redemption.classList.toggle("is-non-sustainable", !greenVersion);
+  elements.prizeImage.classList.toggle("is-non-sustainable", !greenVersion);
   if (allocationPaused) {
-    elements.redemptionTitle.textContent = "";
-    elements.redemptionTitle.hidden = true;
+    elements.redemptionTitle.textContent = copyOr("v2.pausedPrizes", state.language === "zh"
+      ? "獎品已發放完畢" : "All prizes have been distributed.");
+    elements.redemptionTitle.hidden = false;
   } else {
     elements.redemptionTitle.hidden = false;
     const sustainabilityTitle = state.result?.hydrationStyle === "pioneer" && allocation.allocationMethod !== "premium_fallback";
@@ -70,7 +70,7 @@ export function renderRedemptionView(allocation, { state, elements, resultData, 
         : (sustainabilityTitle ? "Pioneer Exclusive" : "You won!"));
   }
 
-  if (greenVersion && !allocationPaused) {
+  if (greenVersion) {
     elements.sustainabilityMessage.hidden = false;
     elements.sustainabilityMessage.textContent = copyOr("v2.sustainabilityMessage", state.language === "zh"
       ? "謝謝你一起響應自帶補水行動｜另可領取永續行動貼紙與飄帶"

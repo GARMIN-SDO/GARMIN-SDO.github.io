@@ -49,7 +49,7 @@ function render(allocation, hydrationStyle = "rest") {
         "v2.redemptionRunnerPrefix": "跑者類型｜",
         "v2.redemptionTitle": "恭喜你抽中！",
         "v2.sustainabilityRedemptionTitle": "永續先鋒隊專屬",
-        "v2.pausedPrizes": "獎品已發放完畢，謝謝參與",
+        "v2.pausedPrizes": "獎品已發放完畢",
         "v2.sustainabilityMessage": "永續行動訊息｜可領取貼紙與飄帶",
         "v2.redemptionInstruction": "請至攤位領取"
       })[key],
@@ -103,7 +103,7 @@ test("premium fallback changes the title while keeping the sustainable green the
   assert.equal(elements.redemption.classList.contains("is-sustainable"), true);
 });
 
-test("paused allocation hides the award card and shows only the inventory status in its place", () => {
+test("paused allocation keeps the themed card and sustainability message", () => {
   const { elements, instruction } = render({
     allocationStatus: "paused",
     sustainabilityRewardEligible: true,
@@ -111,12 +111,20 @@ test("paused allocation hides the award card and shows only the inventory status
     message: { zh: "舊版回應文案" },
     runnerType: "experience"
   });
-  assert.equal(elements.prizeCard.hidden, true);
-  assert.equal(elements.redemptionTitle.hidden, true);
+  assert.equal(elements.prizeCard.hidden, false);
+  assert.equal(elements.redemptionTitle.hidden, false);
   assert.equal(elements.pausedMessage.hidden, false);
-  assert.equal(elements.pausedMessage.textContent, "獎品已發放完畢，謝謝參與");
-  assert.equal(elements.redemption.attributes["aria-labelledby"], "allocation-paused-title");
+  assert.equal(elements.pausedMessage.textContent, "謝謝參與");
+  assert.equal(elements.redemption.attributes["aria-labelledby"], "redemption-title");
   assert.equal(instruction.hidden, true);
+  assert.equal(elements.sustainabilityMessage.hidden, false);
+  assert.equal(elements.redemption.classList.contains("is-sustainable"), true);
+});
+
+test("paused non-sustainable allocations retain the blue theme without hydration thanks", () => {
+  const { elements } = render({ allocationStatus: "paused", sustainabilityRewardEligible: false });
+  assert.equal(elements.redemptionTitle.textContent, "獎品已發放完畢");
+  assert.equal(elements.redemption.classList.contains("is-non-sustainable"), true);
   assert.equal(elements.sustainabilityMessage.hidden, true);
-  assert.equal(elements.redemption.classList.contains("is-sustainable"), false);
+  assert.equal(elements.prizeImage.hidden, true);
 });
