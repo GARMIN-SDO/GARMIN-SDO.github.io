@@ -214,7 +214,8 @@ function prepareShareCard(model) {
     if (generation !== shareRenderGeneration) return null;
     console.error("Result share PNG generation failed.", error?.name, error?.message, error);
     elements.shareStatus.textContent = copy("v2.shareError");
-    setDownloadButtonsDisabled(true);
+    state.shareCardPromise = null;
+    setDownloadButtonsDisabled(false);
     return null;
   });
 }
@@ -368,7 +369,10 @@ function downloadResultCard() {
   };
   // 已備妥的 PNG 直接在點擊事件中下載，保留瀏覽器的使用者操作權限。
   if (state.shareCardBlob) save(state.shareCardBlob);
-  else state.shareCardPromise?.then(save);
+  else {
+    if (!state.shareCardPromise && state.result) prepareShareCard(buildResultViewModel());
+    state.shareCardPromise?.then(save);
+  }
 }
 function renderMockTools() {
   const snapshot = getMockSnapshot();
@@ -427,7 +431,7 @@ document.addEventListener("click", (event) => {
     if (!elements.result.hidden) renderResult();
     if (!elements.redemption.hidden && state.displayedAllocation) {
       renderRedemption(state.displayedAllocation);
-      if (state.result) prepareShareCard(buildResultViewModel());
+      if (state.result) renderResult();
     }
     if (!$("[data-mock-panel]").hidden) renderMockTools();
   }
@@ -479,6 +483,12 @@ async function restorePendingSubmission() {
     if (pending.environment && pending.environment !== environment) throw new Error("API_ENVIRONMENT_MISMATCH");
     const recovery = await getExistingAllocation(pending);
     if (isConfirmedAllocation(recovery, pending, MOCK_MODE || APPS_SCRIPT_DEMO_MODE, MOCK_MODE)) {
+      state.answers = { ...pending.payload.answers };
+      state.sessionId = pending.sessionId;
+      state.requestId = pending.requestId;
+      state.result = classifyAnswers({ questions: content.quizData.questions, answers: state.answers, runnerTypes: content.runnerTypes, rules: classificationRules });
+      state.hydrationCommitment = pending.payload.hydrationCommitment;
+      renderResult();
       clearPendingRequest();
       renderRedemption(recovery.allocation || recovery);
       return;
