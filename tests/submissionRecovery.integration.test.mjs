@@ -2,9 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { parseContent } from '../js/contentData.js';
 
 const source = readFileSync(new URL('../js/appV2.js', import.meta.url), 'utf8');
 const functions = source.slice(source.indexOf('async function submitAnonymousResult()'), source.indexOf('function renderRedemption('));
+const ui = parseContent(readFileSync(new URL('../content.csv', import.meta.url), 'utf8')).ui;
+const failureMessage = '抽獎排隊人潮眾多，請重新抽獎～';
 function environment() {
   let pending = null;
   const sent = [], rendered = [], elements = new Map();
@@ -12,7 +15,7 @@ function environment() {
     language: 'zh', requestId: null, sessionId: 'original-session', answers: { q1: 'original' } };
   const ctx = vm.createContext({ state, API_STATUS: { configured: true }, MOCK_MODE: false, APPS_SCRIPT_DEMO_MODE: true,
     $: key => { if (!elements.has(key)) elements.set(key, {}); return elements.get(key); },
-    document: { querySelectorAll: () => [] }, copy: key => key, id: () => 'original-request',
+    document: { querySelectorAll: () => [] }, copy: key => ui[key]?.zh || key, id: () => 'original-request',
     derivePrizeEligibility: () => ({}), readPendingRequest: () => pending,
     savePendingRequest: value => { pending = structuredClone(value); }, clearPendingRequest: () => { pending = null; },
     getPublicCampaignStatus: async () => ({ ok: true, demoMode: true, quizVersion: 2, submissionVersion: 1 }),
@@ -31,7 +34,8 @@ test('timeout keeps original payload and IDs; manual retry never uses subsequent
   assert.equal(e.pending().requestId, 'original-request');
   assert.equal(e.pending().demoMode, true);
   assert.equal(e.state.submitInProgress, false);
-  assert.match(e.elements.get('[data-result-error]').textContent, /尚待確認/);
+  assert.equal(e.elements.get('[data-result-error]').textContent, failureMessage);
+  assert.equal(e.elements.get('[data-action=continue]').textContent, '重新抽獎');
   e.state.answers.q1 = 'changed'; e.state.requestId = null;
   await e.ctx.submitAnonymousResult();
   assert.equal(e.sent.length, 2);
@@ -70,10 +74,40 @@ test('legacy pending remains queryable but unknown origin never causes a new POS
   await e.ctx.submitAnonymousResult();
   assert.equal(e.sent.length, 1); assert.ok(e.pending());
   assert.equal(e.pending().environment, undefined);
-  assert.match(e.elements.get('[data-result-error]').textContent, /舊版或其他模式/);
+  assert.equal(e.elements.get('[data-result-error]').textContent, failureMessage);
   e.ctx.getExistingAllocation = async () => ({ found: true, allocation: { ok: true } });
   await e.ctx.submitAnonymousResult();
   assert.equal(e.pending(), null); assert.equal(e.sent.length, 1);
+});
+
+test('all final submission failures share the same message and draw-again button', async () => {
+  for (const code of ['TIMEOUT','UNKNOWN','LOCK_BUSY','INTERNAL_ERROR','INVALID_ANSWER','UNSUPPORTED_QUIZ_VERSION','API_ENVIRONMENT_MISMATCH']) {
+    const e = environment();
+    e.ctx.sendAnonymousResult = async () => ({ ok: false, code });
+    await e.ctx.submitAnonymousResult();
+    assert.equal(e.elements.get('[data-result-error]').textContent, failureMessage, code);
+    assert.equal(e.elements.get('[data-action=continue]').textContent, '重新抽獎', code);
+    assert.ok(e.pending(), code);
+  }
+  const unavailable = environment(); unavailable.ctx.API_STATUS.configured = false;
+  await unavailable.ctx.submitAnonymousResult();
+  assert.equal(unavailable.elements.get('[data-result-error]').textContent, failureMessage);
+  assert.equal(unavailable.elements.get('[data-action=continue]').textContent, '重新抽獎');
+  assert.equal(unavailable.sent.length, 0);
+});
+
+test('allocated and confirmed sold-out responses keep the redemption path, including recovery', async () => {
+  for (const allocationStatus of ['allocated','paused']) for (const recovery of [false,true]) {
+    const e = environment();
+    const allocation = { ok: true, demoMode: true, allocationStatus, requestId: 'original-request' };
+    if (recovery) e.ctx.confirmAllocation = async () => allocation;
+    else e.ctx.sendAnonymousResult = async () => allocation;
+    await e.ctx.submitAnonymousResult();
+    assert.equal(e.pending(), null);
+    assert.equal(e.rendered.length, 1);
+    assert.equal(e.rendered[0].allocationStatus, allocationStatus);
+    assert.equal(e.elements.get('[data-result-error]').hidden, true);
+  }
 });
 
 test('Mock pending cannot replay into Apps Script Demo even though both have demoMode true', async () => {

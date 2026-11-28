@@ -49,6 +49,7 @@ export function options(argv) {
     if(s.phase===3&&!out['phase2-accepted']&&!out['http-only-approved']) throw new Error('PHASE2_ACCEPTANCE_REQUIRED');
     if(s.extreme&&!out['jitter-accepted']) throw new Error('JITTER_ACCEPTANCE_REQUIRED');
     if(s.count>=30&&s.extreme&&!out['approve-extreme']) throw new Error('EXPLICIT_30_40_APPROVAL_REQUIRED');
+    if(s.highLoad&&!out['approve-extreme']) throw new Error('EXPLICIT_40_50_APPROVAL_REQUIRED');
   }
   return out;
 }

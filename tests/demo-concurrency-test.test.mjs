@@ -12,12 +12,13 @@ const allocation = p => ({ ok: true, demoMode: true, requestId: p.requestId, ses
   sustainabilityRewardEligible: p.sustainabilityRewardEligible, allocationStatus: 'allocated', prize: { prizeId: 'cap' } });
 
 test('timing capture requires complete matching Demo measurements and excludes response secrets', () => {
-  const diagnostics = { version: 2, demoMode: true, requestId: payload.requestId, attemptId: 'attempt',
+  const diagnostics = { version: 2, demoMode: true, requestId: payload.requestId, attemptId: 'attempt', code: 'LOCK_BUSY',
     ...Object.fromEntries(['lockWaitMs','lockHeldMs','totalMs','requestLookupMs','sheetReadMs','sheetWriteMs'].map(k=>[k,5])),
     sessionId: 'never-copy', redemptionCode: 'never-copy' };
   const r={durationMs:10,body:{diagnostics}};
   const recorded=publicRecord(r,{requestId:payload.requestId},'submit');
   assert.equal(recorded.backend_lockHeldMs,5); assert.equal(recorded.backend_attemptId,'attempt');
+  assert.equal(recorded.backend_code,'LOCK_BUSY');
   assert.equal(JSON.stringify(recorded).includes('never-copy'),false);
   diagnostics.requestId='wrong'; assert.equal(publicRecord(r,{requestId:payload.requestId},'submit').backend_totalMs,undefined);
   diagnostics.requestId=payload.requestId; diagnostics.sheetWriteMs=-1;

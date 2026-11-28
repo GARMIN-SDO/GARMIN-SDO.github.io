@@ -262,7 +262,8 @@ function renderResult() {
   const submitButton = $("[data-action=continue]");
   submitButton.disabled = !API_STATUS.configured || state.submitInProgress;
   if (!API_STATUS.configured) {
-    $("[data-result-error]").textContent = copy("v2.serviceUnavailable");
+    submitButton.textContent = copy("v2.retrySubmit");
+    $("[data-result-error]").textContent = pendingMessage();
     $("[data-result-error]").hidden = false;
   }
   prepareShareCard(viewModel);
@@ -276,7 +277,8 @@ async function submitAnonymousResult() {
     return;
   }
   if (!API_STATUS.configured) {
-    $("[data-result-error]").textContent = copy("v2.serviceUnavailable");
+    $("[data-action=continue]").textContent = copy("v2.retrySubmit");
+    $("[data-result-error]").textContent = pendingMessage();
     $("[data-result-error]").hidden = false;
     return;
   }
@@ -333,15 +335,12 @@ async function submitAnonymousResult() {
     const uncertain = !["API_NOT_CONFIGURED", "API_ENVIRONMENT_NOT_CONFIGURED", "API_ENVIRONMENT_MISMATCH",
       "UNSUPPORTED_QUIZ_VERSION", "INVALID_ANSWER", "ELIGIBILITY_MISMATCH", "REQUEST_ID_CONFLICT", "LEGACY_PENDING_ENVIRONMENT_UNKNOWN"].includes(failure.message);
     if (uncertain) {
-      button.textContent = state.language === "zh" ? "正在確認抽獎結果" : "Confirming your draw result";
       const recovered = await confirmAllocation(pending, getExistingAllocation, {
         demoMode: MOCK_MODE || APPS_SCRIPT_DEMO_MODE, mockMode: MOCK_MODE
       });
       if (recovered) { clearPendingRequest(); renderRedemption(recovered); return; }
     }
-    const messageKey = ["API_NOT_CONFIGURED", "API_ENVIRONMENT_NOT_CONFIGURED", "API_ENVIRONMENT_MISMATCH", "ALLOCATION_PAUSED"].includes(failure.message) ? "v2.serviceUnavailable" :
-      failure.message === "UNSUPPORTED_QUIZ_VERSION" ? "v2.backendOld" : "v2.submitError";
-    $("[data-result-error]").textContent = uncertain || failure.message === "LEGACY_PENDING_ENVIRONMENT_UNKNOWN" || failure.message === "API_ENVIRONMENT_MISMATCH" ? pendingMessage() : copy(messageKey);
+    $("[data-result-error]").textContent = pendingMessage();
     $("[data-result-error]").hidden = false;
   } finally {
     state.submitInProgress = false;
@@ -350,14 +349,7 @@ async function submitAnonymousResult() {
   }
 }
 function pendingMessage() {
-  const pending = readPendingRequest();
-  const environment = MOCK_MODE ? "mock" : APPS_SCRIPT_DEMO_MODE ? "demo" : "production";
-  if (pending?.payload && (!pending.environment || pending.environment !== environment)) {
-    return state.language === "zh" ? "此提交來自舊版或其他模式，尚無法確認結果。請保留本頁及提交編號，返回原抽獎入口確認，或請工作人員協助；請勿重新抽獎。" :
-      "This pending request is from an older version or another mode. Keep this page and request ID; return to the original entry or ask event staff to confirm the result. Do not start a new draw.";
-  }
-  return state.language === "zh" ? "抽獎結果尚待確認，請保留本頁。稍後重試會沿用同一提交編號，不會重新抽獎。" :
-    "Your draw result is pending confirmation. Keep this page and retry later using the same request ID.";
+  return copy("v2.submitError");
 }
 function renderRedemption(allocation) {
   renderRedemptionView(allocation, { state, elements, resultData: content.resultData, text, copy, prizeCatalog, resolveProjectAsset, showScreen });

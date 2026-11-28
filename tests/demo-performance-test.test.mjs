@@ -63,6 +63,23 @@ test('all jitter schedules are deterministic, bounded and cover the requested bu
   const field=schedule('field50-240',123);assert.equal(field[0].offsetMs,0);assert.equal(field.at(-1).offsetMs,240000);
 });
 
+test('40/50 in ten seconds require explicit approval and preserve forty-client cap',async()=>{
+  for(const n of [40,50]){
+    const args=[`--scenario=uniform${n}-10`,'--workflow=flow','--execute','--deployment-confirmed','--off-peak-confirmed','--phase2-accepted'];
+    assert.throws(()=>options(args),/EXPLICIT_40_50_APPROVAL_REQUIRED/);
+    assert.equal(options([...args,'--approve-extreme']).workflow,'flow');
+    for(let round=1;round<=3;round++){
+      const plan=schedule(`uniform${n}-10`,20261127,round);
+      assert.equal(plan.length,n);assert.ok(plan.every(r=>r.offsetMs<=10000));
+    }
+    let active=0,peak=0;
+    const result=await dispatch(Array.from({length:n},(_,index)=>({index,offsetMs:0})),async()=>{
+      active++;peak=Math.max(peak,active);await Promise.resolve();active--;return {ok:true};
+    },{maxInFlight:40,wait:async()=>{}});
+    assert.equal(result.records.length,n);assert.ok(peak<=40);assert.ok(result.peakInFlight<=40);
+  }
+});
+
 test('50 scheduled runners never exceed 40 active; first failure cancels unsent arrivals',async()=>{
   let active=0,peak=0;
   const r=await dispatch(Array.from({length:50},(_,index)=>({index,offsetMs:0})),async()=>{

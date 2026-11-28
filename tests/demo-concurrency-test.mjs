@@ -107,6 +107,7 @@ export function publicRecord(r, meta, operation) {
       if (Number.isFinite(timing[key]) && timing[key] >= 0) measured[`backend_${key}`] = timing[key];
     }
     measured.backend_attemptId = String(timing.attemptId || '');
+    measured.backend_code = /^[A-Z][A-Z0-9_]{0,63}$/.test(timing.code || '') ? timing.code : '';
     if (Number.isFinite(timing.sheetFlushMs) && timing.sheetFlushMs >= 0) measured.backend_sheetFlushMs = timing.sheetFlushMs;
   }
   return { ...meta, ...measured, operation, startedAt: r.startedAt, durationMs: +r.durationMs.toFixed(2), httpStatus: r.httpStatus,

@@ -5,11 +5,16 @@ import vm from "node:vm";
 import { createHash } from "node:crypto";
 
 class Sheet {
-  constructor(rows) { this.rows = structuredClone(rows); }
+  constructor(rows) { this.rows = structuredClone(rows); this.capacity = 1000; this.columns = 26; }
   getLastRow() { return this.rows.length; }
+  getMaxRows() { return this.capacity; }
+  insertRowsAfter(after, count) { assert.equal(after, this.capacity); this.capacity += count; }
   getLastColumn() { return Math.max(0, ...this.rows.map((row) => row.length)); }
   getDataRange() { return { getValues: () => structuredClone(this.rows) }; }
   getRange(row, col, height = 1, width = 1) {
+    if (typeof row === 'string') { assert.equal(row, '1:1'); row=1;col=1;height=1;width=this.columns; }
+    if (row + height - 1 > this.capacity) throw new Error('GRID_LIMIT');
+    if (col + width - 1 > this.columns) throw new Error('COLUMN_LIMIT');
     return {
       createTextFinder: (value) => ({
         matchEntireCell() { return this; },
@@ -25,7 +30,7 @@ class Sheet {
     };
   }
   appendRow(row) { this.rows.push([...row]); }
-  deleteColumns(start, count) { this.rows.forEach((row) => row.splice(start - 1, count)); }
+  deleteColumns(start, count) { this.rows.forEach((row) => row.splice(start - 1, count)); this.columns-=count; }
 }
 function environment({ diagnostics = false } = {}) {
   const sheets = new Map();
@@ -33,6 +38,7 @@ function environment({ diagnostics = false } = {}) {
   const ss = { getSheetByName: (name) => sheets.get(name), insertSheet: (name) => { const sheet = new Sheet([]); sheets.set(name, sheet); return sheet; } };
   let uuid = 0;
   let held = false;
+  let servingGet = false;
   const lock = { tryLock: () => { if (held) return false; held = true; return true; },
     waitLock: () => { assert.equal(held, false); held = true; }, releaseLock: () => { held = false; } };
   const spreadsheetApp = { getActive: () => ss, flush: () => {} };
@@ -46,11 +52,13 @@ function environment({ diagnostics = false } = {}) {
     Utilities: { getUuid: () => `uuid-${++uuid}`, DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' },
       computeDigest: (_algorithm, value) => [...createHash('sha256').update(value).digest()] },
     ContentService: { MimeType: { JSON: "json" }, createTextOutput: (text) => {
-      if (JSON.parse(text).code !== 'LOCK_BUSY') assert.equal(held, false);
+      if (!servingGet && JSON.parse(text).code !== 'LOCK_BUSY') assert.equal(held, false);
       return { text, setMimeType() { return this; } };
     } }
   });
   for (const name of ["Setup", "Inventory", "Validation", "Allocation", "Code"]) vm.runInContext(readFileSync(new URL(`../apps-script/${name}.gs`, import.meta.url), "utf8"), context);
+  const get=context.doGet;
+  context.doGet=(...args)=>{servingGet=true;try{return get(...args);}finally{servingGet=false;}};
   context.setupActivitySheets(); // In-memory workbook only; never connected to a remote Sheet.
   return {
     sheets,
@@ -59,6 +67,7 @@ function environment({ diagnostics = false } = {}) {
     cache,
     logs,
     context,
+    lockHeld: () => held,
     post: (data, mode = "apps-script-demo") => JSON.parse(context.doPost({
       parameter: mode ? { mode } : {},
       postData: { contents: JSON.stringify(data) }
@@ -345,24 +354,167 @@ test("Production summary migration rejects unknown schemas and unresolved prizes
 });
 
 test("A failed dependent flush keeps the request pending and prevents a second stock decrement", () => {
-  for (const soldOut of [false, true]) {
+  for (const mode of ['apps-script-demo','production']) for (const soldOut of [false, true]) {
     const { sheets, context, spreadsheetApp, post } = environment();
-    if (soldOut) sheets.get("DemoPrizes").rows.slice(1).forEach((row) => { row[5] = 0; });
+    const names=context.getModeSheetNames(mode==='apps-script-demo');
+    if (soldOut) sheets.get(names.prizes).rows.slice(1).forEach((row) => { row[5] = 0; });
     const request = data("pioneer");
+    const stockBefore=JSON.stringify(sheets.get(names.prizes).rows);
+    let flushCount=0;
     const recover = () => JSON.parse(context.doGet({ parameter: {
-      action: "getExistingAllocation", mode: "apps-script-demo",
+      action: "getExistingAllocation", mode: mode,
       requestId: request.requestId, sessionId: request.sessionId
     } }).text);
     spreadsheetApp.flush = () => {
-      assert.equal(sheets.get("DemoRequests").rows[1][3], "processing");
+      flushCount++;
+      assert.equal(sheets.get(names.requests).rows[1][3], "processing");
       assert.equal(recover().found, false);
+      if (flushCount === 1) {
+        assert.equal(JSON.stringify(sheets.get(names.prizes).rows),stockBefore);
+        assert.equal(sheets.get(names.participants).rows.length,1);
+        return;
+      }
+      assert.equal(sheets.get(names.participants).rows.length,2);
       throw new Error("simulated write failure");
     };
-    assert.equal(post(request).code, "INTERNAL_ERROR");
-    assert.equal(sheets.get("DemoRequests").rows[1][3], "processing");
-    const beforeRetry = JSON.stringify(sheets.get("DemoPrizes").rows);
-    assert.equal(post(request).code, "REQUEST_PENDING_RETRY");
-    assert.equal(JSON.stringify(sheets.get("DemoPrizes").rows), beforeRetry);
+    assert.equal(post(request,mode).code, "INTERNAL_ERROR");assert.equal(flushCount,2);
+    assert.equal(sheets.get(names.requests).rows[1][3], "processing");
+    const beforeRetry = JSON.stringify(sheets.get(names.prizes).rows);
+    assert.equal(post(request,mode).code, "REQUEST_PENDING_RETRY");
+    assert.equal(JSON.stringify(sheets.get(names.prizes).rows), beforeRetry);
     assert.equal(recover().found, false);
+  }
+});
+
+test("processing flush failure stops before stock/participant writes in both modes", () => {
+  for (const mode of ['apps-script-demo','production']) {
+    const e=environment(),names=e.context.getModeSheetNames(mode==='apps-script-demo');
+    const stock=JSON.stringify(e.sheets.get(names.prizes).rows);
+    let calls=0;e.spreadsheetApp.flush=()=>{calls++;throw new Error('PROCESSING_COMMIT_FAILURE');};
+    const request=data('pioneer');assert.equal(e.post(request,mode).code,'INTERNAL_ERROR');
+    assert.equal(calls,1);assert.equal(e.sheets.get(names.requests).rows[1][3],'processing');
+    assert.equal(JSON.stringify(e.sheets.get(names.prizes).rows),stock);
+    for(const table of [names.participants,names.allocations,names.inventoryLog])assert.equal(e.sheets.get(table).rows.length,1);
+    assert.equal(e.post(request,mode).code,'REQUEST_PENDING_RETRY');assert.equal(calls,1);
+  }
+});
+
+test("full-header validation detects missing/reordered/extra headers without width queries", () => {
+  for (const mode of ['apps-script-demo','production']) for (const table of ['participants','requests']) for (const defect of ['missing','reordered','extra']) {
+    const e=environment(),names=e.context.getModeSheetNames(mode==='apps-script-demo'),sheet=e.sheets.get(names[table]);
+    const stock=JSON.stringify(e.sheets.get(names.prizes).rows);
+    if(defect==='missing')sheet.rows[0].splice(0,1);
+    if(defect==='reordered')[sheet.rows[0][0],sheet.rows[0][1]]=[sheet.rows[0][1],sheet.rows[0][0]];
+    if(defect==='extra'){sheet.columns=30;sheet.rows[0][29]='unexpected-extra-header';}
+    sheet.getLastColumn=()=>{throw new Error('WIDTH_READ_FORBIDDEN');};
+    assert.equal(e.post(data('pioneer'),mode).code,'ANONYMOUS_SCHEMA_MIGRATION_REQUIRED');
+    assert.equal(JSON.stringify(e.sheets.get(names.prizes).rows),stock);
+    assert.equal(e.sheets.get(names.requests).rows.length,1);
+  }
+});
+
+test("Demo26 and Production13/26 reduce metadata reads while preserving writes and all commit barriers", () => {
+  for (const layout of ['demo26', 'production13', 'production26']) for (const paused of [false, true]) {
+    const e = environment(), demo = layout === 'demo26', mode = demo ? 'apps-script-demo' : 'production';
+    const names = e.context.getModeSheetNames(demo);
+    if (layout === 'production26') e.sheets.get(names.participants).rows[0] = Array.from(e.context.LEGACY_PARTICIPANT_HEADERS)
+      .concat(Array.from(e.context.V2_PARTICIPANT_HEADERS), Array.from(e.context.ANONYMOUS_PARTICIPANT_HEADERS));
+    if (paused) e.sheets.get(names.prizes).rows.slice(1).forEach(r => { r[5] = 0; });
+    assert.equal(e.post(data('pioneer', 'existing', 'historical'), mode).ok, true);
+    const requests = e.sheets.get(names.requests), history = JSON.stringify(requests.rows);
+    const otherMode = () => JSON.stringify([...e.sheets].filter(([n]) => demo ? !n.startsWith('Demo') : n.startsWith('Demo')).map(([n,s]) => [n,s.rows]));
+    const otherBefore = otherMode();
+    let lastReads = 0, capacityReads = 0, writes = 0, valueReads = 0, searches = 0;
+    const flushStates = [];
+    const originalLastRow = requests.getLastRow.bind(requests);
+    requests.getLastColumn = () => { throw new Error('UNEXPECTED_WIDTH_READ'); };
+    e.sheets.get(names.participants).getLastColumn = () => { throw new Error('UNEXPECTED_WIDTH_READ'); };
+    requests.getLastRow = () => { assert.equal(e.lockHeld(), true); lastReads++; return originalLastRow(); };
+    requests.getMaxRows = () => { capacityReads++; throw new Error('UNEXPECTED_CAPACITY_READ'); };
+    for (const name of Object.values(names).concat('Settings')) {
+      const sheet = e.sheets.get(name), range = sheet.getRange.bind(sheet), append = sheet.appendRow.bind(sheet);
+      const dataRange=sheet.getDataRange.bind(sheet);
+      sheet.getDataRange=()=>{
+        const result=dataRange(),read=result.getValues;
+        result.getValues=()=>{valueReads++;return read();};return result;
+      };
+      sheet.getRange = (...args) => {
+        const result = range(...args), set = result.setValues, read = result.getValues, search = result.createTextFinder;
+        result.getValues = () => { valueReads++; return read(); };
+        result.createTextFinder = query => {
+          const finder=search(query),find=finder.findAll;
+          finder.findAll=()=>{searches++;return find();};return finder;
+        };
+        result.setValues = values => { assert.equal(e.lockHeld(), true); writes++; return set(values); };
+        return result;
+      };
+      sheet.appendRow = row => { assert.equal(e.lockHeld(), true); assert.notEqual(name, names.requests); writes++; return append(row); };
+    }
+    e.spreadsheetApp.flush = () => {
+      assert.equal(e.lockHeld(), true);
+      assert.equal(e.sheets.get(names.participants).rows.length, flushStates.length === 0 ? 2 : 3);
+      flushStates.push(requests.rows[2][3]);
+    };
+    const payload = data('pioneer', 'existing', 'new-request'), result = e.post(payload, mode);
+    assert.equal(result.allocationStatus, paused ? 'paused' : 'allocated', layout);
+    assert.equal(lastReads, 1, layout); assert.equal(capacityReads, 0);
+    assert.equal(writes, paused ? 3 : 6);
+    assert.deepEqual(flushStates, ['processing', 'processing', paused ? 'paused' : 'allocated']);
+    assert.equal(valueReads,demo?3:4);assert.equal(searches,1);
+    assert.equal(valueReads+searches+lastReads+writes+flushStates.length,demo?(paused?11:14):(paused?12:15));
+    assert.equal(JSON.stringify(requests.rows.slice(0, 2)), history);
+    assert.equal(requests.rows[2][0], payload.requestId);
+    const snapshot = JSON.stringify([...e.sheets].map(([n,s]) => [n,s.rows]));
+    assert.equal(e.post(payload, mode).idempotentReplay, true);
+    assert.equal(JSON.stringify([...e.sheets].map(([n,s]) => [n,s.rows])), snapshot);
+    assert.equal(otherMode(), otherBefore);
+    requests.getLastRow = originalLastRow;
+    const recovery = JSON.parse(e.context.doGet({parameter:{mode,action:'getExistingAllocation',requestId:payload.requestId,sessionId:payload.sessionId}}).text);
+    assert.equal(recovery.found, true); assert.equal(recovery.allocation.participantId, result.participantId);
+  }
+});
+
+test("Requests grid exhaustion grows safely in both environments without losing historical rows", () => {
+  for (const mode of ['apps-script-demo','production']) for (const paused of [false,true]) {
+    const e = environment(), names = e.context.getModeSheetNames(mode === 'apps-script-demo');
+    if (paused) e.sheets.get(names.prizes).rows.slice(1).forEach(r => { r[5] = 0; });
+    assert.equal(e.post(data('pioneer','existing','historical'),mode).ok,true);
+    const sheet=e.sheets.get(names.requests), before=JSON.stringify(sheet.rows);
+    sheet.capacity=sheet.rows.length;
+    let capacityReads=0,growths=0;
+    const max=sheet.getMaxRows.bind(sheet),grow=sheet.insertRowsAfter.bind(sheet);
+    sheet.getMaxRows=()=>{assert.equal(e.lockHeld(),true);capacityReads++;return max();};
+    sheet.insertRowsAfter=(...args)=>{assert.equal(e.lockHeld(),true);growths++;return grow(...args);};
+    const request=data('pioneer','existing','needs-room');
+    assert.equal(e.post(request,mode).allocationStatus,paused?'paused':'allocated');
+    assert.equal(capacityReads,1);assert.equal(growths,1);assert.equal(sheet.rows.length,3);
+    assert.equal(JSON.stringify(sheet.rows.slice(0,2)),before);
+    assert.equal(sheet.rows[2][0],request.requestId);
+    assert.equal(e.post(request,mode).idempotentReplay,true);assert.equal(growths,1);
+  }
+});
+
+test("ordinary or ambiguous processing writes are never blindly retried and cannot consume stock", () => {
+  for (const mode of ['apps-script-demo','production']) for (const committed of [false,true]) {
+    const e=environment(),names=e.context.getModeSheetNames(mode==='apps-script-demo'),sheet=e.sheets.get(names.requests);
+    const original=sheet.getRange.bind(sheet),stock=JSON.stringify(e.sheets.get(names.prizes).rows);
+    let attempts=0;
+    sheet.insertRowsAfter=()=>{throw new Error('UNEXPECTED_GROWTH');};
+    sheet.getRange=(row,col,height,width)=>{
+      const range=original(row,col,height,width),set=range.setValues;
+      if(row===2&&col===1&&width===9)range.setValues=values=>{
+        attempts++;if(committed)set(values);throw new Error('SIMULATED_WRITE_FAILURE');
+      };
+      return range;
+    };
+    const request=data('pioneer','existing','failed-write');
+    assert.equal(e.post(request,mode).code,'INTERNAL_ERROR');assert.equal(attempts,1);
+    assert.equal(JSON.stringify(e.sheets.get(names.prizes).rows),stock);
+    assert.equal(e.sheets.get(names.allocations).rows.length,1);
+    sheet.getRange=original;
+    const retry=e.post(request,mode);
+    assert.equal(retry.code,committed?'REQUEST_PENDING_RETRY':undefined);
+    assert.equal(retry.ok,!committed);
+    if(committed)assert.equal(JSON.stringify(e.sheets.get(names.prizes).rows),stock);
   }
 });

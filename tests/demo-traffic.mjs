@@ -7,6 +7,8 @@ export const SCENARIOS = Object.freeze({
   sync10: { phase: 2, count: 10, rounds: 3, shape: 'sync' },
   'uniform10-10': { phase: 3, count: 10, rounds: 3, shape: 'uniform', windowMs: 10000 },
   'uniform20-10': { phase: 3, count: 20, rounds: 3, shape: 'uniform', windowMs: 10000 },
+  'uniform40-10': { phase: 3, count: 40, rounds: 3, shape: 'uniform', windowMs: 10000, highLoad: true },
+  'uniform50-10': { phase: 3, count: 50, rounds: 3, shape: 'uniform', windowMs: 10000, highLoad: true },
   'uniform20-20': { phase: 3, count: 20, rounds: 3, shape: 'uniform', windowMs: 20000 },
   'uniform20-30': { phase: 3, count: 20, rounds: 3, shape: 'uniform', windowMs: 30000 },
   clustered20: { phase: 3, count: 20, rounds: 3, shape: 'clustered' },
