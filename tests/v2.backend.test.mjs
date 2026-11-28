@@ -10,6 +10,14 @@ class Sheet {
   getDataRange() { return { getValues: () => structuredClone(this.rows) }; }
   getRange(row, col, height = 1, width = 1) {
     return {
+      createTextFinder: (value) => ({
+        matchEntireCell() { return this; },
+        matchCase() { return this; },
+        useRegularExpression() { return this; },
+        findAll: () => Array.from({ length: height }, (_, i) => row + i)
+          .filter((r) => this.rows[r - 1]?.[col - 1] === value)
+          .map((r) => ({ getRow: () => r }))
+      }),
       getValues: () => Array.from({ length: height }, (_, r) => Array.from({ length: width }, (_, c) => this.rows[row - 1 + r]?.[col - 1 + c] ?? "")),
       setValue: (value) => this.getRange(row, col).setValues([[value]]),
       setValues: (values) => { values.forEach((valuesRow, r) => { this.rows[row - 1 + r] ||= []; valuesRow.forEach((value, c) => { this.rows[row - 1 + r][col - 1 + c] = value; }); }); }
@@ -23,8 +31,9 @@ function environment() {
   const ss = { getSheetByName: (name) => sheets.get(name), insertSheet: (name) => { const sheet = new Sheet([]); sheets.set(name, sheet); return sheet; } };
   let uuid = 0;
   const lock = { tryLock: () => true, waitLock: () => {}, releaseLock: () => {} };
+  const spreadsheetApp = { getActive: () => ss, flush: () => {} };
   const context = vm.createContext({
-    Date, JSON, SpreadsheetApp: { getActive: () => ss }, LockService: { getScriptLock: () => lock },
+    Date, JSON, SpreadsheetApp: spreadsheetApp, LockService: { getScriptLock: () => lock },
     Utilities: { getUuid: () => `uuid-${++uuid}` }, ContentService: { MimeType: { JSON: "json" }, createTextOutput: (text) => ({ text, setMimeType() { return this; } }) }
   });
   for (const name of ["Setup", "Inventory", "Validation", "Allocation", "Code"]) vm.runInContext(readFileSync(new URL(`../apps-script/${name}.gs`, import.meta.url), "utf8"), context);
@@ -32,6 +41,7 @@ function environment() {
   return {
     sheets,
     ss,
+    spreadsheetApp,
     context,
     post: (data, mode = "apps-script-demo") => JSON.parse(context.doPost({
       parameter: mode ? { mode } : {},
@@ -282,4 +292,27 @@ test("Production summary migration rejects unknown schemas and unresolved prizes
   context.migrateProductionParticipantSummary();
   assert.equal(sheet.rows[1][12], "");
   assert.deepEqual(sheet.rows[1].slice(7, 12), ["", "", "", "", ""]);
+});
+
+test("A failed dependent flush keeps the request pending and prevents a second stock decrement", () => {
+  for (const soldOut of [false, true]) {
+    const { sheets, context, spreadsheetApp, post } = environment();
+    if (soldOut) sheets.get("DemoPrizes").rows.slice(1).forEach((row) => { row[5] = 0; });
+    const request = data("pioneer");
+    const recover = () => JSON.parse(context.doGet({ parameter: {
+      action: "getExistingAllocation", mode: "apps-script-demo",
+      requestId: request.requestId, sessionId: request.sessionId
+    } }).text);
+    spreadsheetApp.flush = () => {
+      assert.equal(sheets.get("DemoRequests").rows[1][3], "processing");
+      assert.equal(recover().found, false);
+      throw new Error("simulated write failure");
+    };
+    assert.equal(post(request).code, "INTERNAL_ERROR");
+    assert.equal(sheets.get("DemoRequests").rows[1][3], "processing");
+    const beforeRetry = JSON.stringify(sheets.get("DemoPrizes").rows);
+    assert.equal(post(request).code, "REQUEST_PENDING_RETRY");
+    assert.equal(JSON.stringify(sheets.get("DemoPrizes").rows), beforeRetry);
+    assert.equal(recover().found, false);
+  }
 });
