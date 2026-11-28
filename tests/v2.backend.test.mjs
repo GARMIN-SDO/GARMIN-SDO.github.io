@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { createHash } from "node:crypto";
 
 class Sheet {
   constructor(rows) { this.rows = structuredClone(rows); }
@@ -26,15 +27,28 @@ class Sheet {
   appendRow(row) { this.rows.push([...row]); }
   deleteColumns(start, count) { this.rows.forEach((row) => row.splice(start - 1, count)); }
 }
-function environment() {
+function environment({ diagnostics = false } = {}) {
   const sheets = new Map();
+  const cache = new Map(), logs = [];
   const ss = { getSheetByName: (name) => sheets.get(name), insertSheet: (name) => { const sheet = new Sheet([]); sheets.set(name, sheet); return sheet; } };
   let uuid = 0;
-  const lock = { tryLock: () => true, waitLock: () => {}, releaseLock: () => {} };
+  let held = false;
+  const lock = { tryLock: () => { if (held) return false; held = true; return true; },
+    waitLock: () => { assert.equal(held, false); held = true; }, releaseLock: () => { held = false; } };
   const spreadsheetApp = { getActive: () => ss, flush: () => {} };
   const context = vm.createContext({
     Date, JSON, SpreadsheetApp: spreadsheetApp, LockService: { getScriptLock: () => lock },
-    Utilities: { getUuid: () => `uuid-${++uuid}` }, ContentService: { MimeType: { JSON: "json" }, createTextOutput: (text) => ({ text, setMimeType() { return this; } }) }
+    PropertiesService: { getScriptProperties: () => ({ getProperty: () => String(diagnostics) }) },
+    CacheService: { getScriptCache: () => ({ get: key => cache.get(key), put: (key, value) => {
+      assert.equal(held, false); cache.set(key, value);
+    } }) },
+    console: { log: value => logs.push(JSON.parse(value)) },
+    Utilities: { getUuid: () => `uuid-${++uuid}`, DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' },
+      computeDigest: (_algorithm, value) => [...createHash('sha256').update(value).digest()] },
+    ContentService: { MimeType: { JSON: "json" }, createTextOutput: (text) => {
+      if (JSON.parse(text).code !== 'LOCK_BUSY') assert.equal(held, false);
+      return { text, setMimeType() { return this; } };
+    } }
   });
   for (const name of ["Setup", "Inventory", "Validation", "Allocation", "Code"]) vm.runInContext(readFileSync(new URL(`../apps-script/${name}.gs`, import.meta.url), "utf8"), context);
   context.setupActivitySheets(); // In-memory workbook only; never connected to a remote Sheet.
@@ -42,6 +56,8 @@ function environment() {
     sheets,
     ss,
     spreadsheetApp,
+    cache,
+    logs,
     context,
     post: (data, mode = "apps-script-demo") => JSON.parse(context.doPost({
       parameter: mode ? { mode } : {},
@@ -49,6 +65,40 @@ function environment() {
     }).text)
   };
 }
+
+test("Demo timing is session-bound, outside lock, nonpersistent and optional", () => {
+  const e = environment({ diagnostics: true }), request = data('pioneer', 'existing', 'load-timing');
+  const response = e.post(request);
+  for (const key of ['lockWaitMs','lockHeldMs','totalMs','requestLookupMs','sheetReadMs','sheetWriteMs','sheetFlushMs']) {
+    assert.ok(Number.isFinite(response.diagnostics[key]) && response.diagnostics[key] >= 0, key);
+  }
+  assert.equal(e.logs.length, 1);
+  const get = (sessionId = request.sessionId, mode = 'apps-script-demo') => JSON.parse(e.context.doGet({ parameter: {
+    mode, action: 'getDemoRequestTiming', requestId: request.requestId, sessionId
+  } }).text);
+  assert.equal(get().diagnostics.attemptId, response.diagnostics.attemptId);
+  assert.equal(get('different-session').found, false);
+  assert.equal(get(request.sessionId, 'production').code, 'DIAGNOSTICS_UNAVAILABLE');
+  const persisted = JSON.parse(e.sheets.get('DemoRequests').rows[1][4]);
+  assert.equal(persisted.diagnostics, undefined);
+  for (const key of ['answers', 'sessionId', 'redemptionCode']) assert.equal(key in response.diagnostics, false);
+  e.cache.clear(); assert.equal(get().found, false);
+  e.context.CacheService.getScriptCache = () => { throw new Error('CACHE_UNAVAILABLE'); };
+  e.context.console.log = () => { throw new Error('LOG_UNAVAILABLE'); };
+  assert.equal(e.post(data('rest', 'considering', 'load-no-cache')).ok, true);
+  assert.equal(environment().post(request).diagnostics, undefined);
+});
+
+test("request lookup does not read historical result JSON and recovery takes no ScriptLock", () => {
+  const e = environment(), request = data(); e.post(request);
+  e.sheets.get('DemoRequests').getDataRange = () => { throw new Error('FULL_SCAN_FORBIDDEN'); };
+  assert.equal(e.post(request).idempotentReplay, true);
+  e.context.LockService.getScriptLock = () => { throw new Error('LOCK_FORBIDDEN'); };
+  const recovery = JSON.parse(e.context.doGet({ parameter: {
+    mode: 'apps-script-demo', action: 'getExistingAllocation', requestId: request.requestId, sessionId: request.sessionId
+  } }).text);
+  assert.equal(recovery.found, true);
+});
 function data(style = "rest", commitment = "considering", requestId = "test-request") {
   const existing = style === "pioneer";
   return {

@@ -9,6 +9,7 @@ import { renderResultSharePng } from "./shareCard.js";
 import { APPS_SCRIPT_DEMO_MODE, API_STATUS, MOCK_MODE, submitAnonymousResult as sendAnonymousResult, getPublicCampaignStatus, getExistingAllocation,
   getMockSnapshot, applyMockScenario, setMockStock, resetMockTestData, clearMockData, prizeCatalog } from "./apiClient.js";
 import { clearAllocationRecovery, clearPendingRequest, readPendingRequest, savePendingRequest } from "./sessionRecovery.js";
+import { confirmAllocation, isConfirmedAllocation } from "./allocationConfirmation.js";
 
 const $ = (selector) => document.querySelector(selector);
 const setDownloadButtonsDisabled = (disabled) => document.querySelectorAll('[data-action="download-result"]').forEach((button) => { button.disabled = disabled; });
@@ -285,8 +286,9 @@ async function submitAnonymousResult() {
     existingSelfHydration: state.result.sustainability,
     hydrationCommitment: state.hydrationCommitment
   });
-  if (!state.requestId) state.requestId = id();
-  const payload = {
+  const previousPending = readPendingRequest();
+  if (!state.requestId) state.requestId = previousPending?.requestId || id();
+  const payload = previousPending?.payload || {
     submissionVersion: 1,
     quizVersion: 2,
     answers: { ...state.answers },
@@ -297,30 +299,65 @@ async function submitAnonymousResult() {
     requestId: state.requestId,
     sessionId: state.sessionId
   };
-  savePendingRequest({ sessionId: state.sessionId, requestId: state.requestId, payload });
+  const pending = { sessionId: payload.sessionId, requestId: payload.requestId, payload,
+    environment: previousPending?.payload ? previousPending.environment : MOCK_MODE ? "mock" : APPS_SCRIPT_DEMO_MODE ? "demo" : "production",
+    demoMode: previousPending?.payload ? previousPending.demoMode : MOCK_MODE || APPS_SCRIPT_DEMO_MODE };
+  savePendingRequest(pending);
   state.submitInProgress = true;
   const button = $("[data-action=continue]");
   button.disabled = true;
   button.textContent = copy("v2.processing");
   document.querySelectorAll("[data-hydration-choice]").forEach((input) => { input.disabled = true; });
   try {
+    if (previousPending?.payload) {
+      const environment = MOCK_MODE ? "mock" : APPS_SCRIPT_DEMO_MODE ? "demo" : "production";
+      if (pending.environment && pending.environment !== environment) throw new Error("API_ENVIRONMENT_MISMATCH");
+      const recovery = await getExistingAllocation(pending);
+      if (isConfirmedAllocation(recovery, pending, MOCK_MODE || APPS_SCRIPT_DEMO_MODE, MOCK_MODE)) {
+        clearPendingRequest(); renderRedemption(recovery.allocation); return;
+      }
+      // An old/mismatched environment must never be replayed into another workbook.
+      if (!pending.environment) throw new Error("LEGACY_PENDING_ENVIRONMENT_UNKNOWN");
+      if (pending.demoMode !== (MOCK_MODE || APPS_SCRIPT_DEMO_MODE)) throw new Error("API_ENVIRONMENT_MISMATCH");
+    }
     const status = await getPublicCampaignStatus();
     if (!MOCK_MODE && Boolean(status.demoMode) !== APPS_SCRIPT_DEMO_MODE) throw new Error("API_ENVIRONMENT_MISMATCH");
     if (!status.ok || status.quizVersion !== 2 || status.submissionVersion !== 1) throw new Error(status.code || "UNSUPPORTED_QUIZ_VERSION");
     const response = await sendAnonymousResult(payload);
     if (!response.ok) throw new Error(response.code || "SUBMISSION_FAILED");
+    if (!isConfirmedAllocation({ ok: true, found: true, demoMode: response.demoMode, allocation: response }, pending,
+      MOCK_MODE || APPS_SCRIPT_DEMO_MODE, MOCK_MODE)) throw new Error("ALLOCATION_RESPONSE_MISMATCH");
     clearPendingRequest();
     renderRedemption(response);
   } catch (failure) {
+    const uncertain = !["API_NOT_CONFIGURED", "API_ENVIRONMENT_NOT_CONFIGURED", "API_ENVIRONMENT_MISMATCH",
+      "UNSUPPORTED_QUIZ_VERSION", "INVALID_ANSWER", "ELIGIBILITY_MISMATCH", "REQUEST_ID_CONFLICT", "LEGACY_PENDING_ENVIRONMENT_UNKNOWN"].includes(failure.message);
+    if (uncertain) {
+      button.textContent = state.language === "zh" ? "正在確認抽獎結果" : "Confirming your draw result";
+      const recovered = await confirmAllocation(pending, getExistingAllocation, {
+        demoMode: MOCK_MODE || APPS_SCRIPT_DEMO_MODE, mockMode: MOCK_MODE
+      });
+      if (recovered) { clearPendingRequest(); renderRedemption(recovered); return; }
+    }
     const messageKey = ["API_NOT_CONFIGURED", "API_ENVIRONMENT_NOT_CONFIGURED", "API_ENVIRONMENT_MISMATCH", "ALLOCATION_PAUSED"].includes(failure.message) ? "v2.serviceUnavailable" :
       failure.message === "UNSUPPORTED_QUIZ_VERSION" ? "v2.backendOld" : "v2.submitError";
-    $("[data-result-error]").textContent = copy(messageKey);
+    $("[data-result-error]").textContent = uncertain || failure.message === "LEGACY_PENDING_ENVIRONMENT_UNKNOWN" || failure.message === "API_ENVIRONMENT_MISMATCH" ? pendingMessage() : copy(messageKey);
     $("[data-result-error]").hidden = false;
   } finally {
     state.submitInProgress = false;
     button.disabled = !API_STATUS.configured;
     button.textContent = copy("v2.retrySubmit");
   }
+}
+function pendingMessage() {
+  const pending = readPendingRequest();
+  const environment = MOCK_MODE ? "mock" : APPS_SCRIPT_DEMO_MODE ? "demo" : "production";
+  if (pending?.payload && (!pending.environment || pending.environment !== environment)) {
+    return state.language === "zh" ? "此提交來自舊版或其他模式，尚無法確認結果。請保留本頁及提交編號，返回原抽獎入口確認，或請工作人員協助；請勿重新抽獎。" :
+      "This pending request is from an older version or another mode. Keep this page and request ID; return to the original entry or ask event staff to confirm the result. Do not start a new draw.";
+  }
+  return state.language === "zh" ? "抽獎結果尚待確認，請保留本頁。稍後重試會沿用同一提交編號，不會重新抽獎。" :
+    "Your draw result is pending confirmation. Keep this page and retry later using the same request ID.";
 }
 function renderRedemption(allocation) {
   renderRedemptionView(allocation, { state, elements, resultData: content.resultData, text, copy, prizeCatalog, resolveProjectAsset, showScreen });
@@ -371,6 +408,11 @@ document.addEventListener("click", (event) => {
   if (action.startsWith("mock-") && !MOCK_MODE) return;
   if (action === "download-result") { event.preventDefault(); downloadResultCard(); return; }
   if (state.submitInProgress && ["home", "retry", "restart", "back-result"].includes(action)) { event.preventDefault(); return; }
+  if (readPendingRequest()?.payload && ["start", "home", "retry", "restart", "back-result", "back"].includes(action)) {
+    event.preventDefault();
+    if (!state.submitInProgress) restorePendingSubmission();
+    return;
+  }
   if (action === "start") start();
   if (["home", "retry", "restart"].includes(action)) { event.preventDefault(); reset(); showScreen(elements.start); }
   if (action === "next" && state.answers[content.quizData.questions[state.index].id]) {
@@ -435,17 +477,24 @@ if (!MOCK_MODE) {
 window.addEventListener("pageshow", (event) => { if (event.persisted) restorePendingSubmission(); });
 
 async function restorePendingSubmission() {
+  if (state.submitInProgress) return;
   const pending = readPendingRequest();
   if (!pending?.sessionId || !pending?.requestId) return;
+  if (!pending.payload || !content) return;
+  state.submitInProgress = true;
   try {
+    const environment = MOCK_MODE ? "mock" : APPS_SCRIPT_DEMO_MODE ? "demo" : "production";
+    if (pending.environment && pending.environment !== environment) throw new Error("API_ENVIRONMENT_MISMATCH");
     const recovery = await getExistingAllocation(pending);
-    if (recovery?.ok && recovery.found) {
+    if (isConfirmedAllocation(recovery, pending, MOCK_MODE || APPS_SCRIPT_DEMO_MODE, MOCK_MODE)) {
       clearPendingRequest();
       renderRedemption(recovery.allocation || recovery);
       return;
     }
   } catch {
     // Keep the pending anonymous payload and request ID so the user can retry safely.
+  } finally {
+    state.submitInProgress = false;
   }
   if (!pending.payload || !content) return;
   state.answers = { ...pending.payload.answers };
@@ -455,7 +504,7 @@ async function restorePendingSubmission() {
   state.hydrationCommitment = pending.payload.hydrationCommitment;
   renderResult();
   showScreen(elements.result);
-  $("[data-result-error]").textContent = copy("v2.submitError");
+  $("[data-result-error]").textContent = pendingMessage();
   $("[data-result-error]").hidden = false;
   $("[data-action=continue]").textContent = copy("v2.retrySubmit");
 }

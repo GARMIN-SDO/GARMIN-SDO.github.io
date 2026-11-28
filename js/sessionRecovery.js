@@ -26,10 +26,12 @@ export function clearAllocationRecovery() {
   globalThis.localStorage?.removeItem(RECOVERY_KEY);
 }
 
-export function savePendingRequest({ sessionId, requestId, payload }) {
+export function savePendingRequest({ sessionId, requestId, payload, demoMode, environment }) {
   if (!sessionId || !requestId) return;
   const value = { sessionId, requestId };
   if (payload) value.payload = payload;
+  if (typeof demoMode === "boolean") value.demoMode = demoMode;
+  if (["mock", "demo", "production"].includes(environment)) value.environment = environment;
   globalThis.sessionStorage?.setItem(PENDING_KEY, JSON.stringify(value));
 }
 
